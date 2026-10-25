@@ -1,5 +1,7 @@
 # Revenue-to-GL Reconciliation
 
+[![CI](https://github.com/Saigwe/revenue-gl-reconciliation/actions/workflows/ci.yml/badge.svg)](https://github.com/Saigwe/revenue-gl-reconciliation/actions/workflows/ci.yml)
+
 > An incremental dbt pipeline that ties a marketplace's commission revenue sub-ledger to the general ledger with **$0 unexplained variance**, explains every difference, and proposes reclassification journals, with an answer-key test that proves it catches planted errors.
 
 **Author:** Stanley Igwe, Lead Data (Analytics) Engineer · [Portfolio](https://saigwe.github.io)
