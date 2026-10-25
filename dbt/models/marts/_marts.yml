@@ -1,0 +1,154 @@
+version: 2
+
+models:
+  - name: dim_account
+    description: Chart of accounts.
+    columns:
+      - name: account_code
+        data_tests: [unique, not_null]
+
+  - name: dim_merchant
+    description: One row per merchant.
+    columns:
+      - name: merchant_id
+        data_tests: [unique, not_null]
+
+  - name: fct_commission_revenue
+    description: >
+      One row per sub-ledger event (grain: event_id), in local currency and USD, with the system-assigned
+      and expected GL account. Incremental on loaded_at with a lookback of `lookback_days`.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: merchant_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_merchant')
+                field: merchant_id
+      - name: order_id
+        description: Null only for subscription fees.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_ledger__orders')
+                field: order_id
+              config:
+                where: "order_id is not null"
+      - name: usd_per_unit
+        data_tests: [not_null]
+      - name: expected_account_code
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_account')
+                field: account_code
+
+  - name: fct_subledger_batch
+    description: One row per sub-ledger posting batch (grain gl_batch_id), with the USD the GL should hold.
+    columns:
+      - name: gl_batch_id
+        data_tests: [unique, not_null]
+      - name: batch_date
+        data_tests: [not_null]
+      - name: expected_usd
+        data_tests: [not_null]
+
+  - name: fct_gl_revenue_journal
+    description: One row per GL journal on a revenue or contra-revenue account.
+    columns:
+      - name: journal_id
+        data_tests: [unique, not_null]
+
+  - name: rpt_batch_reconciliation
+    description: Sub-ledger batch vs GL. One row per batch, with the reason for any variance.
+    columns:
+      - name: batch_id
+        data_tests: [unique, not_null]
+      - name: variance_reason
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [tied, gl_duplicate, gl_wrong_fx, gl_late_posting, amount_mismatch, missing_in_gl, missing_in_subledger]
+
+  - name: rpt_reconciliation_items
+    description: Reconciling items per batch, account and month that explain the monthly variance.
+    columns:
+      - name: category
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [timing_late_arrival, timing_late_posting, gl_wrong_fx, gl_duplicate,
+                         unexplained_amount_mismatch, unexplained_missing_in_gl, unexplained_missing_in_subledger]
+
+  - name: rpt_monthly_reconciliation
+    description: Month-end reconciliation per revenue account. The audit view.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [account_code, period_month]
+    columns:
+      - name: recon_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [tied, investigate]
+
+  - name: rpt_reclass_proposals
+    description: Proposed reclassification journals for revenue booked to the wrong account.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [event_month, from_account_code, to_account_code, revenue_type]
+
+unit_tests:
+  - name: batch_variance_reasons_are_classified_in_priority_order
+    model: rpt_batch_reconciliation
+    given:
+      - input: ref('fct_subledger_batch')
+        rows:
+          - {gl_batch_id: B-TIED, account_code: "4010", currency_code: CAD, batch_date: 2025-01-10, batch_month: 2025-01-01, scheduled_posting_date: 2025-01-10, is_late_arrival_batch: false, event_count: 3, amount_local: 100.00, usd_per_unit: 0.7, expected_usd: 70.00}
+          - {gl_batch_id: B-DUP, account_code: "4010", currency_code: CAD, batch_date: 2025-01-10, batch_month: 2025-01-01, scheduled_posting_date: 2025-01-10, is_late_arrival_batch: false, event_count: 1, amount_local: 10.00, usd_per_unit: 0.7, expected_usd: 7.00}
+          - {gl_batch_id: B-FX, account_code: "4010", currency_code: CAD, batch_date: 2025-01-10, batch_month: 2025-01-01, scheduled_posting_date: 2025-01-10, is_late_arrival_batch: false, event_count: 1, amount_local: 10.00, usd_per_unit: 0.7, expected_usd: 7.00}
+          - {gl_batch_id: B-LATE, account_code: "4010", currency_code: CAD, batch_date: 2025-01-31, batch_month: 2025-01-01, scheduled_posting_date: 2025-01-31, is_late_arrival_batch: false, event_count: 1, amount_local: 10.00, usd_per_unit: 0.7, expected_usd: 7.00}
+          - {gl_batch_id: B-MISSING, account_code: "4010", currency_code: CAD, batch_date: 2025-01-10, batch_month: 2025-01-01, scheduled_posting_date: 2025-01-10, is_late_arrival_batch: false, event_count: 1, amount_local: 10.00, usd_per_unit: 0.7, expected_usd: 7.00}
+      - input: ref('fct_gl_revenue_journal')
+        rows:
+          - {journal_id: J1, source_batch_id: B-TIED, posting_date: 2025-01-10, account_code: "4010", currency_code: CAD, amount_local: 100.00, fx_rate_used: 0.7, amount_usd: 70.00, posting_seq: 1}
+          - {journal_id: J2, source_batch_id: B-DUP, posting_date: 2025-01-10, account_code: "4010", currency_code: CAD, amount_local: 10.00, fx_rate_used: 0.7, amount_usd: 7.00, posting_seq: 1}
+          - {journal_id: J2D, source_batch_id: B-DUP, posting_date: 2025-01-10, account_code: "4010", currency_code: CAD, amount_local: 10.00, fx_rate_used: 0.7, amount_usd: 7.00, posting_seq: 2}
+          - {journal_id: J3, source_batch_id: B-FX, posting_date: 2025-01-10, account_code: "4010", currency_code: CAD, amount_local: 10.00, fx_rate_used: 0.75, amount_usd: 7.50, posting_seq: 1}
+          - {journal_id: J4, source_batch_id: B-LATE, posting_date: 2025-02-02, account_code: "4010", currency_code: CAD, amount_local: 10.00, fx_rate_used: 0.7, amount_usd: 7.00, posting_seq: 1}
+          - {journal_id: J5, source_batch_id: B-ORPHAN, posting_date: 2025-01-12, account_code: "4010", currency_code: CAD, amount_local: 5.00, fx_rate_used: 0.7, amount_usd: 3.50, posting_seq: 1}
+    expect:
+      rows:
+        - {batch_id: B-TIED, variance_reason: tied, variance_usd: 0.00}
+        - {batch_id: B-DUP, variance_reason: gl_duplicate, variance_usd: 7.00}
+        - {batch_id: B-FX, variance_reason: gl_wrong_fx, variance_usd: 0.50}
+        - {batch_id: B-LATE, variance_reason: gl_late_posting, variance_usd: 0.00}
+        - {batch_id: B-MISSING, variance_reason: missing_in_gl, variance_usd: -7.00}
+        - {batch_id: B-ORPHAN, variance_reason: missing_in_subledger, variance_usd: 3.50}
+
+  - name: weekend_events_use_friday_fx_and_refunds_map_to_contra_account
+    model: fct_commission_revenue
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('stg_ledger__commission_events')
+        rows:
+          - {event_id: E1, order_id: O1, merchant_id: M1, event_ts: "2025-01-04 10:00:00", event_date: 2025-01-04, loaded_at: "2025-01-04 11:00:00", event_type: charge, revenue_type: marketing_fee, currency_code: CAD, amount_local: 10.00, system_account_code: "4010", gl_batch_id: B1}
+          - {event_id: E2, order_id: O1, merchant_id: M1, event_ts: "2025-01-04 12:00:00", event_date: 2025-01-04, loaded_at: "2025-01-04 13:00:00", event_type: refund, revenue_type: commission, currency_code: CAD, amount_local: -4.00, system_account_code: "4090", gl_batch_id: B2}
+      - input: ref('int_fx_rates_daily')
+        rows:
+          - {rate_date: 2025-01-04, currency_code: CAD, usd_per_unit: 0.7, published_rate_date: 2025-01-03, is_fallback_rate: true}
+      - input: ref('stg_ref__chart_of_accounts')
+        rows:
+          - {account_code: "4010", revenue_type: commission}
+          - {account_code: "4020", revenue_type: marketing_fee}
+          - {account_code: "4090", revenue_type: refund}
+    expect:
+      rows:
+        - {event_id: E1, usd_per_unit: 0.7, amount_usd: 7.0, expected_account_code: "4020", is_misclassified: true}
+        - {event_id: E2, usd_per_unit: 0.7, amount_usd: -2.8, expected_account_code: "4090", is_misclassified: false}

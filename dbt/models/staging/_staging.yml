@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: stg_ledger__commission_events
+    description: Typed sub-ledger events, filtered to those loaded by `load_cutoff`.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [charge, refund]
+      - name: revenue_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [commission, marketing_fee, subscription]
+      - name: currency_code
+        data_tests: [not_null]
+      - name: gl_batch_id
+        data_tests: [not_null]
+  - name: stg_ledger__orders
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+  - name: stg_gl__journal_lines
+    columns:
+      - name: journal_line_id
+        data_tests: [unique, not_null]
+      - name: account_code
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_ref__chart_of_accounts')
+                field: account_code
+  - name: stg_fx__rates
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [rate_date, currency_code]
+    columns:
+      - name: usd_per_unit
+        data_tests: [not_null]
+  - name: stg_ref__merchants
+    columns:
+      - name: merchant_id
+        data_tests: [unique, not_null]
+  - name: stg_ref__chart_of_accounts
+    columns:
+      - name: account_code
+        data_tests: [unique, not_null]

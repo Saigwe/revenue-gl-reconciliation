@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Raw synthetic extracts written by ingestion/generate_ledger.py. Append-only; never edited by dbt.
+    tables:
+      - name: commission_events
+        description: Revenue sub-ledger. One row per commission, marketing-fee, subscription or refund event.
+        loaded_at_field: loaded_at
+      - name: orders
+        description: Marketplace orders that commission events are charged on.
+      - name: gl_journal_lines
+        description: General ledger journal lines. Every journal has a revenue line and a receivables offset.
+      - name: fx_rates
+        description: Business-day FX reference rates (USD per unit). No weekend or holiday rows.
+      - name: ref_merchants
+        description: Merchant reference data.
+      - name: ref_chart_of_accounts
+        description: Chart of accounts, with the revenue type each revenue account should hold.
+      - name: planted_issues
+        description: Answer key for tests only. Models must never read it.

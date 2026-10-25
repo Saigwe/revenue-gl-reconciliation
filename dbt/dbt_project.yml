@@ -1,0 +1,30 @@
+name: revenue_recon
+version: "0.1.0"
+config-version: 2
+profile: revenue_recon
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Load-time cutoff for the sub-ledger. Used to simulate a first load followed by an incremental run.
+  load_cutoff: "9999-12-31 00:00:00"
+  # Re-read events loaded this many days before the newest load, to catch out-of-order loads.
+  lookback_days: 3
+  # Variances below this (in USD or local currency) are treated as rounding.
+  tolerance: 0.005
+
+models:
+  revenue_recon:
+    staging:
+      +schema: silver
+      +materialized: view
+    intermediate:
+      +schema: silver
+      +materialized: table
+    marts:
+      +schema: gold
+      +materialized: table
