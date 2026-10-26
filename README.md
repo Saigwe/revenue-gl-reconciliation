@@ -123,7 +123,7 @@ make fixture-all  # small ledger, used in CI
 - [ ] Snowflake run (trial account) with runtime and credit cost
 - [ ] Streamlit "close cockpit": monthly status, drill from account to batch to event, and a reclass journal export
 - [ ] Data contracts (`contract: enforced`) on the gold models
-- [ ] 3-minute Loom walkthrough
+- [ ] 3-minute Loom walkthrough ([script ready](docs/walkthrough.md))
 
 ## Data and licence
 - **Data:** fully synthetic, generated with a fixed seed by `ingestion/generate_ledger.py`. FX rates are a random walk shaped like ECB reference rates, published on business days only. Merchants, amounts and accounts are invented and don't describe any real company.
