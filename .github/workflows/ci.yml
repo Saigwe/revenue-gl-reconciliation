@@ -17,3 +17,5 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Fixture pipeline (synthetic ledger -> dbt build with unit and data tests -> incremental check)
         run: make fixture-all
+      - name: README charts render from the results
+        run: python charts/make_charts.py --db warehouse/fixture.duckdb --out "$RUNNER_TEMP/charts"

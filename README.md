@@ -20,6 +20,11 @@ Based on work I did in accounting analytics at a US food-delivery company, rebui
 | **Why it matters** | Finance gets **one tied number per account and month**, a list of exactly what to fix (duplicates, wrong FX, late postings), and reclass journals ready to book, all reproducible for audit. |
 | **Proof** | An answer-key test plants errors in the synthetic GL and fails the build unless every one is found with the right reason and amount, **and nothing else is flagged**. See [Numbers](#numbers). |
 
+## Charts
+Rendered from this repo's own results by `charts/make_charts.py` (`make charts`); CI re-renders them on every push.
+
+![Sub-ledger vs GL variance by cause](docs/charts/variance_by_cause.png)
+
 ## Architecture
 ```mermaid
 flowchart LR

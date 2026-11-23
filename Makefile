@@ -3,7 +3,7 @@ DB ?= warehouse/recon.duckdb
 FIXTURE_DB ?= warehouse/fixture.duckdb
 DBT = cd dbt && RECON_DUCKDB_PATH=../$(DB) dbt
 
-.PHONY: all fixture-all bronze bronze-fixture dbt incremental-check dagster clean
+.PHONY: all fixture-all bronze bronze-fixture dbt incremental-check dagster clean charts
 
 all: bronze dbt incremental-check                     ## full synthetic ledger (2,000 merchants, 6 months)
 fixture-all:                                          ## small ledger, used in CI
@@ -26,3 +26,6 @@ dagster:
 
 clean:
 	rm -rf warehouse dbt/target dbt/logs
+
+charts:                                            ## README charts -> docs/charts
+	$(PY) charts/make_charts.py
